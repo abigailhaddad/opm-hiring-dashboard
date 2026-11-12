@@ -1,0 +1,32 @@
+# Every Monday: pull every table behind OPM's hiring dashboard and, if the dashboard has been refreshed since
+# the last upload, publish the new pull to Hugging Face (publish.py compares the refresh time).
+# Secret: HF_TOKEN (write access to abigailhaddad/opm-hiring-dashboard).
+name: Update
+
+on:
+  schedule:
+    - cron: "0 13 * * 1"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Publish even if the refresh time is unchanged"
+        type: boolean
+        default: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python test_pull.py
+      - name: Pull every table
+        run: python -u pull.py
+      - name: Publish if the dashboard was refreshed
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: python publish.py ${{ inputs.force && '--force' || '' }}

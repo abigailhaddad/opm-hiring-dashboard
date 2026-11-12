@@ -1,0 +1,5 @@
+myenv/
+data/
+publish/
+__pycache__/
+*.log
