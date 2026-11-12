@@ -38,4 +38,4 @@ These run against responses captured from the live endpoint (`fixtures/`), so th
 - Power BI returns the distinct combinations of the requested columns, so fully identical rows in a table would be collapsed into one. `USAS Source` and `Announcement Fact` include the USAJOBS Control Number, so they aren't affected. The bridge tables and `Assessment Fact` might be.
 - The `DAX Measures` table holds only the dashboard's calculated measures and is skipped.
 - The script fails with an error if the schema, paging or response format isn't what it expects. If OPM republishes the dashboard under a new link, update `EMBED_URL` in `pull.py`; if Microsoft moves the API cluster, update `API_BASE`.
-- The data is whatever OPM has published (the dashboard currently says data through 09/30/2026). Check with HX@opm.gov about reuse questions.
+- The data is whatever OPM has published; the dataset card on Hugging Face gives the refresh time of the copy there. Check with HX@opm.gov about reuse questions.

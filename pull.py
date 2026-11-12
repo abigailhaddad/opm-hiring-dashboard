@@ -181,6 +181,24 @@ def pull_table(session, model, table, columns, page_size):
         restart_tokens = page.restart_tokens
 
 
+def model_row_count(session, model, table, columns):
+    """Rows the dashboard's model holds for a table: the largest count of non-blank values in any column
+    (Power BI aggregation 5). A second count, independent of the paged pull, to compare it against."""
+    best = 0
+    for column in columns:
+        query = build_query(model, table, [column], 1, None)
+        command = query["queries"][0]["Query"]["Commands"][0]["SemanticQueryDataShapeCommand"]
+        command["Query"]["Select"] = [{"Aggregation": {"Expression": {"Column": {
+            "Expression": {"SourceRef": {"Source": "t"}}, "Property": column}}, "Function": 5}, "Name": "c"}]
+        command["Binding"] = {"Primary": {"Groupings": [{"Projections": [0]}]},
+                              "DataReduction": {"DataVolume": 3, "Primary": {"Top": {}}}, "Version": 1}
+        result = call_api(session, "POST", "querydata?synchronous=true", query)["results"][0]["result"]
+        if "data" not in result:
+            raise RuntimeError(f"{table}.{column}: count query failed: {json.dumps(result)[:300]}")
+        best = max(best, result["data"]["dsr"]["DS"][0]["PH"][0]["DM0"][0].get("M0") or 0)
+    return best
+
+
 def csv_name(table):
     return re.sub(r"[^A-Za-z0-9]+", "_", table).strip("_").lower() + ".csv"
 
@@ -216,10 +234,15 @@ def main():
 
     out_dir = Path(args.out)
     out_dir.mkdir(exist_ok=True)
+    counts = {}
     for table in selected:
         rows = pull_table(session, model, table, tables[table], args.page_size)
         write_csv(out_dir / csv_name(table), tables[table], rows)
-        print(f"{table}: {len(rows)} rows -> {out_dir / csv_name(table)}")
+        in_model = model_row_count(session, model, table, tables[table])
+        counts[csv_name(table)[:-4]] = {"table": table, "pulled": len(rows), "in_model": in_model}
+        print(f"{table}: {len(rows)} rows (model: {in_model}) -> {out_dir / csv_name(table)}", flush=True)
+    # read by publish.py for the dataset card's checks
+    (out_dir / "_counts.json").write_text(json.dumps(counts, indent=1))
 
 
 if __name__ == "__main__":

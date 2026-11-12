@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - run: python test_pull.py
+      - run: python test_pull.py && python test_publish.py
       - name: Pull every table
         run: python -u pull.py
       - name: Publish if the dashboard was refreshed

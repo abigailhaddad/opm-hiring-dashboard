@@ -3,11 +3,12 @@
     HF_TOKEN=... myenv/bin/python publish.py [--data data] [--dry-run] [--force]
 
 The dashboard's refresh time comes from USAS Source, whose last column is named after it (for example
-"10/1/2026 11:41:37 AM"). That column is renamed `dashboard_refreshed_at` so the schema stays the same from
+"<month>/<day>/<year> <time>"). That column is renamed `dashboard_refreshed_at` so the schema stays the same from
 one refresh to the next. Nothing is uploaded if the dataset already holds this refresh, unless --force.
 Every count in the card is computed from the files.
 """
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -23,7 +24,7 @@ MARKER = "Dashboard refreshed: "
 
 def load(data: Path) -> tuple[dict[str, pd.DataFrame], str]:
     tables, refreshed = {}, None
-    for f in sorted(data.glob("*.csv")):
+    for f in sorted(p for p in data.glob("*.csv") if not p.name.startswith("_")):
         df = pd.read_csv(f, dtype=str, keep_default_na=False, na_values=[""])
         stamp = [c for c in df.columns if REFRESH_HEADER.match(c)]
         if stamp:
@@ -38,7 +39,19 @@ def load(data: Path) -> tuple[dict[str, pd.DataFrame], str]:
     return tables, refreshed
 
 
-def card(tables: dict[str, pd.DataFrame], refreshed: str) -> str:
+def count_check(counts: dict) -> str:
+    """The card's sentence on pulled vs model row counts, from pull.py's _counts.json."""
+    off = {n: c for n, c in counts.items() if c["pulled"] != c["in_model"]}
+    lead = (f"Each table's row count was compared with the count the dashboard's own model reports for it "
+            f"(a separate query). {len(counts) - len(off)} of {len(counts)} match")
+    if not off:
+        return lead + "."
+    bits = "; ".join(f"`{n}` {c['pulled']:,} pulled vs {c['in_model']:,} in the model" for n, c in off.items())
+    return (lead + f". The others: {bits}. The dashboard's query interface returns distinct rows, so rows "
+            f"identical in every column come back once; a table short by a few rows has that many duplicates.")
+
+
+def card(tables: dict[str, pd.DataFrame], refreshed: str, counts: dict) -> str:
     u, a = tables["usas_source"], tables["announcement_fact"]
     only_a = (~a["USAJOBS Control Number"].isin(u["USAJOBS Control Number"])).sum()
     years = u["Announcement Open Date"].str[:4].value_counts().sort_index()
@@ -78,11 +91,9 @@ Announcements opened per year in `usas_source`: """ + ", ".join(f"{y} {n:,}" for
 
 ## Checks
 
-- Each table's row count was compared with the count the dashboard's own model reports for it. All match
-  except `assessment_fact` and `series_bridge`, which are each one row short on the 2026-10-01 refresh: the
-  dashboard's query interface returns distinct rows, so a row identical to another in every column comes back
-  once.
-- `USAJOBS Control Number` is unique in both `usas_source` and `announcement_fact`.
+- {count_check(counts)}
+- `USAJOBS Control Number`: {u["USAJOBS Control Number"].nunique():,} distinct of {len(u):,} rows in `usas_source`,
+  {a["USAJOBS Control Number"].nunique():,} of {len(a):,} in `announcement_fact`.
 - `announcement_fact` has {only_a:,} announcements that are not in `usas_source`, in every year; every
   `usas_source` announcement is in `announcement_fact`. The dashboard's definitions name two sources, USA
   Staffing and Monster Government Solutions, so the extra announcements are probably Monster's. That is an
@@ -119,7 +130,10 @@ def main() -> int:
     for n, df in tables.items():
         df.to_parquet(a.out / "data" / f"{n}.parquet", index=False)
         df.to_csv(a.out / "data" / f"{n}.csv", index=False)
-    (a.out / "README.md").write_text(card(tables, refreshed))
+    counts_file = a.data / "_counts.json"
+    if not counts_file.exists():
+        raise SystemExit(f"{counts_file} is missing: run pull.py, which writes it")
+    (a.out / "README.md").write_text(card(tables, refreshed, json.loads(counts_file.read_text())))
     print({n: len(df) for n, df in tables.items()}, "refreshed", refreshed)
     if a.dry_run:
         print(f"dry run: wrote {a.out}, uploaded nothing")
