@@ -17,6 +17,31 @@ def test_refresh_header_pattern():
     assert not publish.REFRESH_HEADER.match("Total Applications")
 
 
+def test_fiscal_year_starts_in_october():
+    import pandas as pd
+    fy = publish.fiscal_year(pd.Series(["2019-09-30", "2019-10-01", "2026-09-30T00:00:00"]))
+    assert list(fy) == [2019, 2020, 2026]
+
+
+def test_quirks_reports_counts_from_the_data():
+    import pandas as pd
+    u = pd.DataFrame({
+        "Direct Hire Indicator": ["false"] * 4,
+        "Announcement Number": ["A", "A", "B", "C"],
+        "Announcement Status": ["Closed", "Closed", "Removed", "Open"],
+        "Manual Assessment Method": [None, None, None, "Interview"],
+        "Announcement Open Date": ["2026-03-02", "2026-03-05", "2026-09-01", "2026-09-02"],
+        "Selection Made for Vacancy?": ["Yes", "Yes", "No", "Yes"],
+        "Appointment Type ID": ["1", "2", "1", "1"],
+        "Appointment Type": ["Permanent", "Term", "Seasonal", "Permanent"],
+    })
+    text = publish.quirks(u)
+    assert "`false` on all 4 rows" in text
+    assert "opened in 2026-09, 50%" in text and "opened in 2026-03, 100%" in text
+    assert "2 rows share" in text and "Closed 2, Removed 1, Open 1" in text
+    assert "`Term`;" in text and "about 75% of rows" in text
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:
