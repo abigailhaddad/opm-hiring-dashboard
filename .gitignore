@@ -4,3 +4,4 @@ publish/
 __pycache__/
 *.log
 analysis/cache/
+drafts/
