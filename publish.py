@@ -56,36 +56,33 @@ def fiscal_year(dates: pd.Series) -> pd.Series:
     return d.dt.year + (d.dt.month >= 10).astype(int)
 
 
-def quirks(u: pd.DataFrame) -> str:
-    """Bullets on columns that don't mean what they look like they mean; every count comes from the data."""
+OPM_SAYS = """This is OPM's data as its dashboard publishes it; we haven't corrected or re-checked it against other
+sources. The dashboard's General Information page describes it this way:
+
+- It covers fiscal years 2020 on, and data may be incomplete for some agencies.
+- It excludes records where the agency applied a Direct Hire, Excepted Service, or EO 13932 Exempt tag.
+- It covers hiring into the competitive service (delegated examining and merit promotion), which OPM notes is
+  a slice of overall agency hiring.
+- Selection data covers jobs opened about four months before the end of the data, to allow time for
+  selections.
+- Announcements come from the USA Staffing and Apply Government Solutions hiring systems.
+
+Read the dashboard's pages and the `data_definitions` table for OPM's definitions."""
+
+
+def column_notes(u: pd.DataFrame, only_a: int) -> str:
+    """Plain facts about the columns, each computed from the data."""
     dh = u["Direct Hire Indicator"].value_counts()
-    ann_dup = u["Announcement Number"].duplicated(keep=False).sum()
-    status = u["Announcement Status"].value_counts()
-    status_txt = ", ".join(f"{s} {n:,}" for s, n in status.items())
-    manual = u["Manual Assessment Method"].isna().mean()
-    opened = pd.to_datetime(u["Announcement Open Date"].str[:10])
-    last = opened.dt.to_period("M").max()
-    sel = u["Selection Made for Vacancy?"].eq("Yes")
-    early = opened.dt.to_period("M") == last - 6
-    late = opened.dt.to_period("M") == last
-    term = u.loc[u["Appointment Type ID"] == "2", "Appointment Type"].unique()
     dh_txt = (f"`false` on all {len(u):,} rows" if list(dh.index) == ["false"]
               else "; ".join(f"`{v}` {n:,}" for v, n in dh.items()))
-    return f"""- `Direct Hire Indicator` is {dh_txt}. The dashboard says it excludes announcements
-  where the agency applied a Direct Hire, Excepted Service, or EO 13932 Exempt tag, so this column can't be
-  used to find direct-hire jobs.
-- Selections are still coming in for recent announcements. Of announcements opened in {last}, {sel[late].mean():.0%}
-  show a selection; of those opened in {last - 6}, {sel[early].mean():.0%}. The dashboard only reports selections
-  for jobs opened about four months before the end of its data; do the same when computing selection rates.
-- The dashboard's announcement counts come from `announcement_fact`, which includes the announcements that are
-  not in `usas_source`. Use `announcement_fact` to match its numbers.
-- `Announcement Status` includes announcements that were removed or are still open: {status_txt}.
-- `USAJOBS Control Number` is the unique key. `Announcement Number` is not: {ann_dup:,} rows share
-  theirs with another row.
-- `Appointment Type ID` is 2 only for `Appointment Type` {", ".join(f"`{t}`" for t in term)}; every other
-  appointment type, including seasonal and intermittent, is 1.
-- The manual assessment columns (`Manual Assessment Method`, `Manual Assessment Method Details`,
-  `Method Details Clean`) are blank on about {manual:.0%} of rows."""
+    status = ", ".join(f"{s} {n:,}" for s, n in u["Announcement Status"].value_counts().items())
+    ann_dup = u["Announcement Number"].duplicated(keep=False).sum()
+    return f"""- The dashboard's announcement counts match `announcement_fact`, which has {only_a:,} announcements that
+  aren't in `usas_source`.
+- `Direct Hire Indicator` is {dh_txt}.
+- `Announcement Status`: {status}.
+- `USAJOBS Control Number` is unique in each table. `Announcement Number` is not: {ann_dup:,} rows in
+  `usas_source` share theirs with another row."""
 
 
 def card(tables: dict[str, pd.DataFrame], refreshed: str, counts: dict) -> str:
@@ -128,20 +125,22 @@ as text, as the dashboard has them.
 
 Announcements opened per fiscal year in `usas_source`: """ + ", ".join(f"FY{y} {n:,}" for y, n in years.items()) + f""".
 
-## Things to know before using it
+## What the data is
 
-{quirks(u)}
+{OPM_SAYS}
+
+## Notes on the columns
+
+{column_notes(u, only_a)}
 
 ## Checks
 
 - {count_check(counts)}
 - `USAJOBS Control Number`: {u["USAJOBS Control Number"].nunique():,} distinct of {len(u):,} rows in `usas_source`,
   {a["USAJOBS Control Number"].nunique():,} of {len(a):,} in `announcement_fact`.
-- `announcement_fact` has {only_a:,} announcements that are not in `usas_source`, in every year; every
-  `usas_source` announcement is in `announcement_fact`. The dashboard names two sources: USA Staffing, and
-  Monster Government Solutions (in the `data_definitions` table) or Apply Government Solutions (on its General
-  Information page). The extra announcements are probably from that second system. That is an inference, not
-  something the dashboard states.
+- Every `usas_source` announcement is in `announcement_fact`.
+- Numbers on three dashboard pages were reproduced from these tables; see `checks/` in the code repository
+  and `check_dashboard.py`.
 
 ## Notes
 

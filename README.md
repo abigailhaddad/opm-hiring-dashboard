@@ -1,6 +1,6 @@
 # opm-hiring-dashboard
 
-**The data:** [huggingface.co/datasets/abigailhaddad/opm-hiring-dashboard](https://huggingface.co/datasets/abigailhaddad/opm-hiring-dashboard), every table as Parquet and CSV, checked weekly and updated when OPM refreshes the dashboard (`.github/workflows/update.yml`, `publish.py`). Read the dataset card's "Things to know before using it" section before analyzing it.
+**The data:** [huggingface.co/datasets/abigailhaddad/opm-hiring-dashboard](https://huggingface.co/datasets/abigailhaddad/opm-hiring-dashboard), every table as Parquet and CSV, checked weekly and updated when OPM refreshes the dashboard (`.github/workflows/update.yml`, `publish.py`).
 
 Pulls the row-level tables behind OPM's [Federal Hiring Assessment and Selection Outcome Dashboard](https://www.opm.gov/policy-data-oversight/federal-hiring-and-selection-outcome-dashboard/) and writes each one to CSV.
 
@@ -8,7 +8,7 @@ The dashboard is an embedded Power BI report. OPM doesn't publish a download lin
 
 ## What it covers
 
-Competitive-service job announcements (delegated examining and merit promotion) opened from fiscal year 2020 on, from USA Staffing and one other hiring system. Per the dashboard, it leaves out announcements the agency tagged Direct Hire, Excepted Service, or EO 13932 Exempt, and it may be incomplete for some agencies. Selections for the most recent four months of announcements are still coming in.
+Whatever OPM's dashboard publishes, as it publishes it. This project copies the data; it doesn't correct it or check it against other sources. The dashboard describes its data as competitive-service job announcements (delegated examining and merit promotion) from fiscal year 2020 on, from the USA Staffing and Apply Government Solutions hiring systems, excluding records the agency tagged Direct Hire, Excepted Service, or EO 13932 Exempt, and possibly incomplete for some agencies. Its selection numbers cover jobs opened about four months before the end of the data. See the dashboard's General Information page and the `data_definitions` table for OPM's definitions.
 
 ## Setup
 
