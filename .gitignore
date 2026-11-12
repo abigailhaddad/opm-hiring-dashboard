@@ -3,3 +3,4 @@ data/
 publish/
 __pycache__/
 *.log
+analysis/cache/
