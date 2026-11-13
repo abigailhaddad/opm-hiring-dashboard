@@ -101,6 +101,14 @@ def test_decode_nulls_and_repeats():
     assert page.rows == [[1, "x"], [2, None], [2, None]]
 
 
+def test_decode_values_keyed_by_column_name():
+    # one-column results come as {"G0": value} rather than {"C": [value]}
+    schema = [{"N": "G0", "T": 4}]
+    dataset = {"PH": [{"DM0": [{"S": schema, "G0": 2012}, {"G0": 2013}, {"R": 1}]}], "IC": True}
+    page = pull.decode_page({"results": [{"result": {"data": {"dsr": {"DS": [dataset]}}}}]})
+    assert page.rows == [[2012], [2013], [2013]]
+
+
 def test_decode_rejects_misaligned_row():
     schema = [{"N": "G0", "T": 4}, {"N": "G1", "T": 4}]
     dataset = {"PH": [{"DM0": [{"S": schema, "C": [1]}]}], "IC": True}

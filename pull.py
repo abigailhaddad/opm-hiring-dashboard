@@ -117,7 +117,13 @@ def convert_cell(value, column, dicts):
 def decode_row(raw, previous, schema, dicts):
     repeat = raw.get("R", 0)
     nulls = raw.get("Ø", 0)
-    cells = iter(raw.get("C", []))
+    # Rows normally carry their values in "C". A one-column result instead keys
+    # the value by the column's name, e.g. {"G0": 2012} (seen live on EEOC's
+    # complaints dashboard, table "Fiscal Year").
+    if "C" in raw:
+        cells = iter(raw["C"])
+    else:
+        cells = iter([raw[column["N"]] for column in schema if column["N"] in raw])
     missing = object()
     row = []
     for index, column in enumerate(schema):
